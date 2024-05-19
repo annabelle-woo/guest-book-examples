@@ -4,6 +4,7 @@ import { POINT_ONE, Claim } from './model'
 @NearBindgen({})
 class GuestBook {
   messages: Vector<Claim> = new Vector<Claim>("v-uid");
+  insurance_Id: string = "jacobtest2.testnet";
 
   @call({ payableFunction: true })
   // Public - Adds a new message.
@@ -32,11 +33,11 @@ class GuestBook {
     injury_claim: number,
     property_claim: number,
     vehicle_claim: number, }) {
-    
+
     const premium = near.attachedDeposit() >= BigInt(POINT_ONE);
     const sender = near.predecessorAccountId();
     let account_Id = near.predecessorAccountId();
-    
+
     const message: Claim = {
     account_Id,
     policy_deductable, 
@@ -54,6 +55,19 @@ class GuestBook {
     vehicle_claim
     } ;
     this.messages.push(message);
+  }
+
+  @call({ payableFunction: true })
+  enter_pool() {
+    // Get who is calling the method and how much $NEAR they attached
+    let payment: bigint = near.attachedDeposit() as bigint;
+
+    let toTransfer = payment;
+
+    const promise = near.promiseBatchCreate(this.insurance_Id)
+    near.promiseBatchActionTransfer(promise, toTransfer)
+
+    // Return the total amount donated so far
   }
 
   @view({})
