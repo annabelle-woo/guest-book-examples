@@ -5,35 +5,79 @@ import SignIn from './components/SignIn';
 import Messages from './components/Messages';
 import { utils } from 'near-api-js';
 
+import { Contract } from './services/near-interface';
+
 const CONTRACT_NAME = "jacobtest2.testnet"
+// When creating the wallet you can choose to create an access key, so the user
+// can skip signing non-payable methods when interacting with the contract
 const wallet = new Wallet({ createAccessKeyFor: CONTRACT_NAME })
+
+// Abstract the logic of interacting with the contract to simplify your project
+const contract = new Contract({ contractId: process.env.CONTRACT_NAME, walletToUse: wallet });
 
 
 function App() {
-
-
-
-
   
   const [isSignedIn, setIsSignedIn] = useState(false);
-  const [messages, setMessages] = useState([]);
+    const [messages, setMessages] = useState([]);
 
-  useEffect(() => {
-    const initFunction = async () => {
-      const isSignedIn = await wallet.startUp();
-      const messages = await getLast10Messages();
+    useEffect(() => {
+      const checkIfSignedIn = async () => {
+        const signedIn = await wallet.startUp();
+        setIsSignedIn(signedIn);  
+        if (signedIn) {
+          console.log("IN");
+          signedInFlow();
+          console.log("OUT");
+          signedOutFlow(); 
+        }
+      };
+    
+      checkIfSignedIn();
+    }, []);
+    
 
-      setIsSignedIn(isSignedIn);
-      setMessages(messages.reverse());
-    }
-    initFunction();
-  }, []);
 
   const getLast10Messages = async () => {
     const total_messages = await wallet.viewMethod({ contractId: CONTRACT_NAME, method: "total_messages" });
     const from_index = total_messages >= 10 ? total_messages - 10 : 0;
     return wallet.viewMethod({ contractId: CONTRACT_NAME, method: "get_messages", args: { from_index: String(from_index), limit: "10" } });
   }
+  async function enterPool() {
+    if (isSignedIn) {
+
+      try {
+        await contract.enter_pool(1)
+      } catch (e) {
+        alert(
+          'Something went wrong! ' +
+          'Maybe you need to sign out and back in? ' +
+          'Check your browser console for more info.'
+        )
+        throw e
+      }
+
+
+
+      try {
+        await wallet.callMethod({ contractId: CONTRACT_NAME, method: "enter_pool", attachedDeposit: amountToAttach });
+        console.log("Pool entry successful");
+        await updateUI();
+      } catch (error) {
+        console.error('Error entering pool:', error);
+      }
+    } else {
+      console.log("User is not signed in.");
+    }
+  }
+  
+
+  async function updateUI() {
+    const messages = await getLast10Messages();
+    setMessages(messages.reverse());
+    console.log("UI updated");
+  }
+
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -85,10 +129,21 @@ function App() {
     message.focus();
   };
 
-  const signIn = () => { wallet.signIn() }
+  const signIn = async () => {
+    await wallet.signIn();
+    setIsSignedIn(true); };
+  
+  const signOut = async () => {
+    await wallet.signOut();
+    setIsSignedIn(false); };
+  
 
-  const signOut = () => { wallet.signOut() }
-
+  async function signedInFlow() {
+  await updateUI();
+  }
+  function signedOutFlow() {
+  }
+  //const enterPool = () => { wallet.callMethod({contractId: CONTRACT_NAME, method: "enter_pool", utils.format.parseNearAmount(0.5) })
   return (
     <main>
       <table>
@@ -102,10 +157,13 @@ function App() {
       </table>
 
       <hr />
-      {isSignedIn
-        ? <Form onSubmit={onSubmit} currentAccountId={wallet.accountId} />
-        : <SignIn />
-      }
+      {isSignedIn ? (
+        <>
+          <Form onSubmit={onSubmit} currentAccountId={wallet.accountId} />
+          <button onClick={enterPool}>Enter Pool</button> 
+        </>
+      ) : ( <SignIn />
+     ) }
 
       <hr />
 
@@ -113,6 +171,11 @@ function App() {
 
     </main>
   )
+
+
+
+
+
 }
 
 export default App
